@@ -1,12 +1,4 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-
-#define BUFFLEN 512
-#define N_CLIENTS 5
+#include "server.h"
 
 void error(const char* err)
 {
@@ -14,11 +6,15 @@ void error(const char* err)
     exit(EXIT_FAILURE);
 }
 
+void* handle_connection(void* p_clientfd) {
+
+}
+
 int main(int argc, char* argv[])
 {
     struct sockaddr_in serv_addr, cli_addr;
     socklen_t cli_len = sizeof(cli_addr), serv_len = sizeof(serv_addr);
-    int sockfd, newsockfd[N_CLIENTS];
+    int sockfd, newsockfd;
     int port, msg_len, n_nsock = 0;
     char buffer[BUFFLEN];
     
@@ -43,28 +39,22 @@ int main(int argc, char* argv[])
         error("Failed to bind socket");
     }
 
-    printf("Waiting for connenction\n");
-
-    listen(sockfd, 5);
-    if (n_nsock <= N_CLIENTS) {
-
-        if ((newsockfd[n_nsock] = accept(sockfd, (struct sockaddr*)&cli_addr, &cli_len)) < 0) {
-            error("Failed to accept connection");
-        }
-
-        n_nsock++;
-    }
+    listen(sockfd, SERVER_BACKLOG);
 
     while (1)
     {
+        printf("Waiting for connenction\n");
+
+        if ((newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &cli_len)) < 0) {
+            error("Failed to accept connection");
+        }
+
         printf("Waiting for data...\n");
 
         memset(buffer, 0, sizeof(buffer));
         fflush(stdout);
 
-        // for(int i; i < n_nsock; i++)
-        // {
-        if ((msg_len = read(newsockfd[0], buffer, BUFFLEN)) < 0) {
+        if ((msg_len = read(newsockfd, buffer, BUFFLEN)) < 0) {
             error("Failed to read");
         } else if (msg_len == 0) {
             break;
@@ -72,13 +62,11 @@ int main(int argc, char* argv[])
 
         printf("Recived packet from %s:%d\n", inet_ntoa(cli_addr.sin_addr),ntohs(cli_addr.sin_port));
         printf("Data: %s", buffer);
-        // }
+
+        close(newsockfd);
     }
 
     close(sockfd);
-    for(int i; i < n_nsock; i++) {
-        close(newsockfd[n_nsock]);
-    }
 
     return EXIT_SUCCESS;
 }
