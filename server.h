@@ -12,7 +12,12 @@
 #define BUFFLEN 512
 #define SERVER_BACKLOG 5
 
-void error(const char* err)
-void* handle_connection(void* p_clientfd)
+void error(const char* err);
+void* handle_connection(void* p_clientfd);
+
+struct args_struct {
+    void* arg1;
+    void* arg2;
+};
 
 #endif
