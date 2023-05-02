@@ -20,7 +20,7 @@ void* handle_connection(void* p_arguments) {
     
     fflush(stdout);
 
-    while(1)
+    while (1)
     {
         // printf("Waiting for data...\n");
 
