@@ -11,6 +11,7 @@
 
 #define BUFFLEN 512
 #define SERVER_BACKLOG 5
+#define MAX_CONNECTIONS 100
 
 void error(const char* err);
 void* handle_connection(void* p_clientfd);
@@ -18,6 +19,8 @@ void* handle_connection(void* p_clientfd);
 struct args_struct {
     void* arg1;
     void* arg2;
+    void* arg3;
+    void* arg4;
 };
 
 #endif

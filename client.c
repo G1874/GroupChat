@@ -6,13 +6,51 @@ void error(const char* err)
     exit(EXIT_FAILURE);
 }
 
+void* handle_sending_msg(void* p_arguments)
+{
+    int sockfd = *((int*)p_arguments);
+    char buffer[BUFFLEN];
+    fflush(stdin);
+
+    while (1)
+    {
+        memset(buffer, 0, BUFFLEN);
+
+        fgets(buffer, BUFFLEN, stdin);
+
+        if (write(sockfd, buffer, BUFFLEN) < 0) {
+            error("Failed to write");
+        }
+    }
+
+    return NULL;
+}
+
+void handle_receiving_msg(const int* sockfd)
+{
+    int msg_len;
+    char buffer[BUFFLEN];
+    fflush(stdout);
+    
+    while (1)
+    {
+        memset(buffer, 0, BUFFLEN);
+
+        if ((msg_len = read(*sockfd, buffer, BUFFLEN)) < 0) {
+            error("Failed to read");
+        }
+
+        printf("%s\n", buffer);
+    }
+}
+
 int main(int argc, char* argv[])
 {
     struct sockaddr_in serv_addr, cli_addr;
     socklen_t cli_len = sizeof(cli_addr), serv_len = sizeof(serv_addr);
     struct hostent* server;
+    pthread_t t;
     int sockfd, port;
-    char buffer[BUFFLEN];
 
     memset(&serv_addr, 0, serv_len);
     memset(&cli_addr, 0, cli_len);
@@ -39,19 +77,11 @@ int main(int argc, char* argv[])
     if (connect(sockfd, (struct sockaddr*)&serv_addr, serv_len)) {
         error("Failed to connect to server");
     }
-        
-    fflush(stdin);
 
-    while (1)
-    {
-        memset(buffer, 0, sizeof(buffer));
+    pthread_create(&t, NULL, handle_sending_msg, (void*)&sockfd);
+    handle_receiving_msg(&sockfd);
 
-        fgets(buffer, sizeof(buffer), stdin);
-
-        if (write(sockfd, &buffer, sizeof(buffer)) < 0) {
-            error("Failed to write to socket");
-        }
-    }
+    pthread_join(t, NULL);
 
     close(sockfd);
 

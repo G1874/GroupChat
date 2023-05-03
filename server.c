@@ -12,8 +12,8 @@ void* handle_connection(void* p_arguments) {
 
     int clientfd = *((int*)arguments.arg1);
     struct sockaddr_in cli_addr = *((struct sockaddr_in*)arguments.arg2);
-
-    // free(p_arguments);
+    int* n_nsock = (int*)arguments.arg3;
+    int* clientfd_list = (int*)arguments.arg4;
 
     int msg_len;
     char buffer[BUFFLEN];
@@ -22,19 +22,42 @@ void* handle_connection(void* p_arguments) {
 
     while (1)
     {
-        // printf("Waiting for data...\n");
-
         memset(buffer, 0, sizeof(buffer));
 
         if ((msg_len = read(clientfd, buffer, BUFFLEN)) < 0) {
-            error("Failed to read");
+            break;
         } else if (msg_len == 0) {
             break;
         }
-
-        // printf("%s:%d - %s\n", inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port), buffer);
+        
         printf("%d - %s\n", ntohs(cli_addr.sin_port), buffer);
+        printf("%d\n\n", *n_nsock);
+
+        printf("%d\n", *n_nsock);
+        for (int i = 0; i < *n_nsock; i++) {
+            if (clientfd_list[i] != 0) {
+                if (write(clientfd_list[i], buffer, BUFFLEN) < 0) {
+                    printf("Failed to write to %d\n", clientfd_list[i]);
+                }
+            }
+            printf("%d\n", clientfd_list[i]);
+        }
     }
+
+    // TODO implement a mutex
+    int j = 0;
+    for (int i = 0; i < *n_nsock; i++) {
+        clientfd_list[j] = ((int*)arguments.arg4)[i];
+        j++;
+        if (((int*)arguments.arg4)[i] == clientfd) {
+            j--;
+        }
+    }
+    *n_nsock--;
+    // TODO implement a mutex
+
+    arguments.arg4 = realloc(clientfd_list, *n_nsock);
+    free(clientfd_list);
 
     close(clientfd);
 
@@ -46,20 +69,18 @@ int main(int argc, char* argv[])
     struct sockaddr_in serv_addr, cli_addr;
     struct args_struct arguments;
     socklen_t cli_len = sizeof(cli_addr), serv_len = sizeof(serv_addr);
-    int sockfd, newsockfd;
-    int port, n_nsock = 0;
+    int sockfd, clientfd;
+    int* clientfd_list = calloc(1, sizeof(int));
+    int port = 8888, n_nsock = 0, client_index = 0;
 
-    memset((char*)&serv_addr, 0, serv_len);
-    memset((char*)&cli_addr, 0, cli_len);
+    memset((void*)&serv_addr, 0, serv_len);
+    memset((void*)&cli_addr, 0, cli_len);
 
-    arguments.arg1 = malloc(sizeof(int));
-    arguments.arg2 = malloc(sizeof(struct sockaddr_in));
-
-    if (argc != 2) {
-        error("No port provided");
-    }
+    // if (argc != 2) {
+    //     error("No port provided");
+    // }
     
-    port = atoi(argv[1]);
+    // port = atoi(argv[1]);
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -77,17 +98,23 @@ int main(int argc, char* argv[])
 
     while (1)
     {
-        // printf("Waiting for connenction\n");
+        if (n_nsock < MAX_CONNECTIONS) {
+            if ((clientfd = accept(sockfd, (struct sockaddr*)&cli_addr, &cli_len)) < 0) {
+                error("Failed to accept connection");
+            }
 
-        if ((newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &cli_len)) < 0) {
-            error("Failed to accept connection");
+            if ((sizeof(clientfd_list)/sizeof(int)) < (n_nsock + 1)) {
+                clientfd_list = realloc(clientfd_list, sizeof(clientfd_list) + sizeof(int));
+            }
+            clientfd_list[n_nsock] = clientfd;
+
+            n_nsock++;
         }
 
-        arguments.arg1 = (void*)&newsockfd;
+        arguments.arg1 = (void*)&clientfd;
         arguments.arg2 = (void*)&cli_addr;
-
-        // struct args_struct* p_arguments = malloc(sizeof(struct args_struct));
-        // p_arguments = &arguments;
+        arguments.arg3 = (void*)&n_nsock;
+        arguments.arg4 = (void*)clientfd_list;
 
         pthread_t t;
         pthread_create(&t, NULL, handle_connection, (void*)&arguments);
