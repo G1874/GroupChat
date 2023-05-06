@@ -46,14 +46,11 @@ void handle_receiving_msg(const int* sockfd)
 
 int main(int argc, char* argv[])
 {
-    struct sockaddr_in serv_addr, cli_addr;
+    struct sockaddr_in serv_addr = {0}, cli_addr = {0};
     socklen_t cli_len = sizeof(cli_addr), serv_len = sizeof(serv_addr);
     struct hostent* server;
     pthread_t t;
     int sockfd, port;
-
-    memset(&serv_addr, 0, serv_len);
-    memset(&cli_addr, 0, cli_len);
 
     if (argc != 3) {
         error("No port provided");

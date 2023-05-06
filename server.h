@@ -17,10 +17,11 @@ void error(const char* err);
 void* handle_connection(void* p_clientfd);
 
 struct args_struct {
-    void* arg1;
-    void* arg2;
-    void* arg3;
-    void* arg4;
+    int arg1;
+    struct sockaddr_in arg2;
+    int arg3;
+    int* arg4;
+    FILE* arg5;
 };
 
 #endif
