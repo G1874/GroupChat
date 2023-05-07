@@ -19,6 +19,7 @@ void* handle_sending_msg(void* p_arguments)
         memset(msg_buffer, 0, MESSAGE_LENGTH);
 
         fgets(msg_buffer, MESSAGE_LENGTH, stdin);
+        printf("%c", '\n');
         strcat(buffer, "M");
         strcat(buffer, msg_buffer);
 
@@ -59,7 +60,7 @@ void handle_receiving_msg(const int* sockfd)
             }
         }
         
-        printf("\033[0;31m%s\033[0m - %s", client_username, msg_buffer);
+        printf("\033[0;31m%s\033[0m - %s\n", client_username, msg_buffer);
     }
 }
 
