@@ -1,4 +1,4 @@
-#include "server.h"
+#include "group_chat.h"
 
 void error(const char* err)
 {
@@ -12,45 +12,72 @@ void* handle_connection(void* p_arguments)
 
     int clientfd = arguments.arg1;
     struct sockaddr_in cli_addr = arguments.arg2;
-    int n_nsock = arguments.arg3;
+    int* n_nsock = arguments.arg3;
     int* clientfd_list = arguments.arg4;
     FILE* p_file = arguments.arg5;
 
     int msg_len;
     char buffer[BUFFLEN];
+    char msg_buffer[MESSAGE_LENGTH];
+    char client_username[USERNAME_LENGTH];
+    char request[REQUEST_LENGTH];
 
     fflush(stdout);
 
-    while (1)
-    {
-        memset(buffer, 0, sizeof(buffer));
+    if (read(clientfd, client_username, USERNAME_LENGTH) >= 0) {
+        while (1)
+        {
+            memset(buffer, 0, BUFFLEN);
 
-        if ((msg_len = read(clientfd, buffer, BUFFLEN)) < 0) {
-            break;
-        } else if (msg_len == 0) {
-            break;
-        }
-        
-        printf("%d - %s\n", ntohs(cli_addr.sin_port), buffer);
-        printf("%d\n\n", n_nsock);
+            if ((msg_len = read(clientfd, buffer, BUFFLEN)) <= 0) {
+                break;
+            }
 
-        for (int i = 0; i <= n_nsock; i++) {
-            if (clientfd_list[i] != 0) {
-                if (write(clientfd_list[i], buffer, BUFFLEN) < 0) {
-                    printf("Failed to write to %d\n", clientfd_list[i]);
+            printf("%d - %s", ntohs(cli_addr.sin_port), buffer);
+
+            if (buffer[0] == 'M') {
+                for (int i = 0; i < (msg_len-1); i++) {
+                    msg_buffer[i] = buffer[i+1];
+                }
+
+                memset(buffer, 0, BUFFLEN);
+                strcat(buffer, client_username);
+                strcat(buffer, msg_buffer);
+
+                p_file = fopen("file.csv", "a+");
+                fprintf(p_file,"%s, %s\n", client_username, msg_buffer);
+                fclose(p_file);
+
+                for (int i = 0; i <= *n_nsock; i++) {
+                    if (clientfd_list[i] != 0 && clientfd_list[i] != clientfd) {
+                        if (write(clientfd_list[i], buffer, BUFFLEN) < 0) {
+                            printf("Failed to write to %d\n", clientfd_list[i]);
+                        }
+                    }
+                    printf("%d ", clientfd_list[i]);
+                }
+                printf("%c", '\n');
+            } else if (buffer[0] == 'R') {
+                memset(request, 0, REQUEST_LENGTH);
+
+                for(int i = 0; i < REQUEST_LENGTH; i++) {
+                    request[i] = buffer[i+1];
+                }
+                
+                if (strncmp(request, LOAD_REQUEST, sizeof(LOAD_REQUEST))) {
+
                 }
             }
-            printf("%d\n", clientfd_list[i]);
         }
     }
 
-    // TODO implement a mutex
-    for (int i = 0; i <= n_nsock; i++) {
+    // TODO implement a semaphor
+    for (int i = 0; i <= *n_nsock; i++) {
         if (clientfd_list[i] == clientfd) {
             clientfd_list[i] = 0;
         }
     }
-    // TODO implement a mutex
+    // TODO implement a semaphor
 
     close(clientfd);
 
@@ -68,6 +95,8 @@ int main(int argc, char* argv[])
 
     FILE* p_file;
     p_file = fopen("file.csv", "a+");
+    fprintf(p_file,"User Name, Message\n");
+    fclose(p_file);
 
     if (argc != 2) {
         error("No port provided");
@@ -114,7 +143,7 @@ int main(int argc, char* argv[])
 
         arguments.arg1 = clientfd;
         arguments.arg2 = cli_addr;
-        arguments.arg3 = n_nsock;
+        arguments.arg3 = &n_nsock;
         arguments.arg4 = clientfd_list;
         arguments.arg5 = p_file;
 

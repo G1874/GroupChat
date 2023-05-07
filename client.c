@@ -1,4 +1,4 @@
-#include "client.h"
+#include "group_chat.h"
 
 void error(const char* err)
 {
@@ -10,13 +10,17 @@ void* handle_sending_msg(void* p_arguments)
 {
     int sockfd = *((int*)p_arguments);
     char buffer[BUFFLEN];
+    char msg_buffer[MESSAGE_LENGTH];
     fflush(stdin);
 
     while (1)
     {
         memset(buffer, 0, BUFFLEN);
+        memset(msg_buffer, 0, MESSAGE_LENGTH);
 
-        fgets(buffer, BUFFLEN, stdin);
+        fgets(msg_buffer, MESSAGE_LENGTH, stdin);
+        strcat(buffer, "M");
+        strcat(buffer, msg_buffer);
 
         if (write(sockfd, buffer, BUFFLEN) < 0) {
             error("Failed to write");
@@ -30,17 +34,32 @@ void handle_receiving_msg(const int* sockfd)
 {
     int msg_len;
     char buffer[BUFFLEN];
+    char msg_buffer[MESSAGE_LENGTH];
+    char client_username[USERNAME_LENGTH];
     fflush(stdout);
     
     while (1)
     {
         memset(buffer, 0, BUFFLEN);
+        memset(msg_buffer, 0, MESSAGE_LENGTH);
+        memset(client_username, 0, USERNAME_LENGTH);
 
         if ((msg_len = read(*sockfd, buffer, BUFFLEN)) < 0) {
             error("Failed to read");
         }
 
-        printf("%s\n", buffer);
+        for (int i = 0; i < msg_len; i++) {
+            if (buffer[i] != '\n') {
+                client_username[i] = buffer[i];
+            } else {
+                for (int j = 0; j < (msg_len-i); j++) {
+                    msg_buffer[j] = buffer[i+j+1];
+                }
+                break;
+            }
+        }
+        
+        printf("\033[0;31m%s\033[0m - %s", client_username, msg_buffer);
     }
 }
 
@@ -51,6 +70,7 @@ int main(int argc, char* argv[])
     struct hostent* server;
     pthread_t t;
     int sockfd, port;
+    char username[USERNAME_LENGTH];
 
     if (argc != 3) {
         error("No port provided");
@@ -73,6 +93,14 @@ int main(int argc, char* argv[])
 
     if (connect(sockfd, (struct sockaddr*)&serv_addr, serv_len)) {
         error("Failed to connect to server");
+    }
+
+    printf("Enter username: ");
+    fgets(username, USERNAME_LENGTH, stdin);
+    printf("%c", '\n');
+
+    if (write(sockfd, username, USERNAME_LENGTH) < 0) {
+        error("Failed to write");
     }
 
     pthread_create(&t, NULL, handle_sending_msg, (void*)&sockfd);
