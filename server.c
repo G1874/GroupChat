@@ -1,5 +1,8 @@
 #include "group_chat.h"
 
+static pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex2 = PTHREAD_MUTEX_INITIALIZER;
+
 void error(const char* err)
 {
     perror(err);
@@ -44,16 +47,20 @@ void* handle_connection(void* p_arguments)
                 strcat(buffer, client_username);
                 strcat(buffer, msg_buffer);
 
+                pthread_mutex_lock(&mutex2);
                 p_file = fopen("file.csv", "a+");
-                fprintf(p_file,"%s, %s\n", client_username, msg_buffer);
+                fprintf(p_file,"%s, %d, %s, %s", inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port), client_username, msg_buffer);
                 fclose(p_file);
+                pthread_mutex_unlock(&mutex2);
 
                 for (int i = 0; i <= *n_nsock; i++) {
+                    pthread_mutex_lock(&mutex1);                    
                     if (clientfd_list[i] != 0 && clientfd_list[i] != clientfd) {
                         if (write(clientfd_list[i], buffer, BUFFLEN) < 0) {
                             printf("Failed to write to %d\n", clientfd_list[i]);
                         }
                     }
+                    pthread_mutex_unlock(&mutex1);
                     printf("%d ", clientfd_list[i]);
                 }
                 printf("%c", '\n');
@@ -71,13 +78,13 @@ void* handle_connection(void* p_arguments)
         }
     }
 
-    // TODO implement a semaphor
+    pthread_mutex_lock(&mutex1);
     for (int i = 0; i <= *n_nsock; i++) {
         if (clientfd_list[i] == clientfd) {
             clientfd_list[i] = 0;
         }
     }
-    // TODO implement a semaphor
+    pthread_mutex_unlock(&mutex1);
 
     close(clientfd);
 
@@ -95,7 +102,14 @@ int main(int argc, char* argv[])
 
     FILE* p_file;
     p_file = fopen("file.csv", "a+");
-    fprintf(p_file,"User Name, Message\n");
+    if (p_file) {
+        fseek(p_file, 0, SEEK_END);
+        int f_size = ftell(p_file);
+        
+        if (f_size == 0) {
+            fprintf(p_file,"User Name, Message\n");
+        }
+    }
     fclose(p_file);
 
     if (argc != 2) {
@@ -124,7 +138,8 @@ int main(int argc, char* argv[])
             if ((clientfd = accept(sockfd, (struct sockaddr*)&cli_addr, &cli_len)) < 0) {
                 error("Failed to accept connection");
             }
-
+            
+            pthread_mutex_lock(&mutex1);
             if (clientfd_list[n_nsock] != 0) {
                 n_nsock++;
             }
@@ -139,6 +154,7 @@ int main(int argc, char* argv[])
             if (clientfd_list[n_nsock] == 0) {
                 n_nsock--;
             }
+            pthread_mutex_unlock(&mutex1);
         }
 
         arguments.arg1 = clientfd;
